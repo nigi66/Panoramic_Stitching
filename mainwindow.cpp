@@ -99,11 +99,19 @@ void MainWindow::stitchingImages() {
         return a.distance < b.distance;
     });
 
+    const int numMatchesToDraw = 20;
+    if (matches.size() > numMatchesToDraw) {
+        matches.resize(numMatchesToDraw);
+    }
+
+    // Draw top 20 matches
     cv::Mat matchesImg;
     cv::drawMatches(img1, keypoints1, img2, keypoints2, matches, matchesImg, cv::Scalar::all(-1), cv::Scalar::all(-1),
                     std::vector<char>(), cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
 
+
     QString matchesPath = "matches.jpg";
+    cv::imwrite(matchesPath.toStdString(), matchesImg);
     displayImage(matchesPath, correspodenceLabel);
 
     // stitching the images
@@ -120,6 +128,7 @@ void MainWindow::stitchingImages() {
 
 
     QString resultPath = "result.jpg";
+    cv::imwrite(resultPath.toStdString(), pano);
     displayImage(resultPath, stitchImageLabel);
 }
 
