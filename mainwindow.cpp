@@ -28,6 +28,10 @@ MainWindow::MainWindow(QWidget *parent)
     layoutV->addWidget(loadImage2Button);
     layoutV->addWidget(stitchingButton);
 
+    correspodenceLabel = new QLabel("No image loaded", this);
+    correspodenceLabel->setAlignment(Qt::AlignCenter);
+    layoutV->addWidget(correspodenceLabel);
+
     stitchImageLabel = new QLabel("No image loaded", this);
     stitchImageLabel->setAlignment(Qt::AlignCenter);
     layoutV->addWidget(stitchImageLabel);
@@ -38,7 +42,7 @@ MainWindow::MainWindow(QWidget *parent)
     // Connect buttons to actions
     connect(loadImage1Button, &QPushButton::clicked, this, &MainWindow::loadFirstImage);
     connect(loadImage2Button, &QPushButton::clicked, this, &MainWindow::loadSecondImage);
-    connect(stitchingButton, &QPushButton::clicked, this, &MainWindow::stitchImages);
+    connect(stitchingButton, &QPushButton::clicked, this, &MainWindow::stitchingImages);
 
 }
 
@@ -60,34 +64,63 @@ void MainWindow::loadSecondImage(){
 }
 
 
-void MainWindow::stitchImages(){
+
+void MainWindow::stitchingImages() {
     if (imagePath1.isEmpty() || imagePath2.isEmpty()) {
-         QMessageBox::warning(this, "Error", "Please load both images first!");
-         return;
-     }
+        QMessageBox::warning(this, "Error", "Please load both images first!");
+        return;
+    }
 
-     cv::Mat img1 = cv::imread(imagePath1.toStdString());
-     cv::Mat img2 = cv::imread(imagePath2.toStdString());
-     if (img1.empty() || img2.empty()) {
-         QMessageBox::warning(this, "Error", "Failed to load one or both images!");
-         return;
-     }
+    // Load images with OpenCV
+    cv::Mat img1 = cv::imread(imagePath1.toStdString());
+    cv::Mat img2 = cv::imread(imagePath2.toStdString());
+    if (img1.empty() || img2.empty()) {
+        QMessageBox::warning(this, "Error", "Failed to load one or both images!");
+        return;
+    }
 
-     // Stitch images
-     std::vector<cv::Mat> images = {img1, img2};
-     cv::Mat pano;
-     cv::Stitcher::Mode mode = cv::Stitcher::PANORAMA;
-     cv::Ptr<cv::Stitcher> stitcher = cv::Stitcher::create(mode);
-     cv::Stitcher::Status status = stitcher->stitch(images, pano);
+    cv::Mat gray1, gray2;
+    cv::cvtColor(img1, gray1, cv::COLOR_BGR2GRAY);
+    cv::cvtColor(img2, gray2, cv::COLOR_BGR2GRAY);
 
-     if (status != cv::Stitcher::OK) {
-         QMessageBox::warning(this, "Error", "Failed to stitch images!");
-         return;
-     }
+    // Detect and compute features using ORB
+    cv::Ptr<cv::ORB> orb = cv::ORB::create();
+    std::vector<cv::KeyPoint> keypoints1, keypoints2;
+    cv::Mat descriptors1, descriptors2;
+    orb->detectAndCompute(gray1, cv::noArray(), keypoints1, descriptors1);
+    orb->detectAndCompute(gray2, cv::noArray(), keypoints2, descriptors2);
 
-     QString resultPath = "result.jpg";
-     cv::imwrite(resultPath.toStdString(), pano);
-     displayImage(resultPath, stitchImageLabel);
+    cv::BFMatcher matcher(cv::NORM_HAMMING, true);
+    std::vector<cv::DMatch> matches;
+    matcher.match(descriptors1, descriptors2, matches);
+
+    // Sort matches by distance
+    std::sort(matches.begin(), matches.end(), [](const cv::DMatch &a, const cv::DMatch &b) {
+        return a.distance < b.distance;
+    });
+
+    cv::Mat matchesImg;
+    cv::drawMatches(img1, keypoints1, img2, keypoints2, matches, matchesImg, cv::Scalar::all(-1), cv::Scalar::all(-1),
+                    std::vector<char>(), cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
+
+    QString matchesPath = "matches.jpg";
+    displayImage(matchesPath, correspodenceLabel);
+
+    // stitching the images
+    std::vector<cv::Mat> images = {img1, img2};
+    cv::Mat pano;
+    cv::Stitcher::Mode mode = cv::Stitcher::PANORAMA;
+    cv::Ptr<cv::Stitcher> stitcher = cv::Stitcher::create(mode);
+    cv::Stitcher::Status status = stitcher->stitch(images, pano);
+
+    if (status != cv::Stitcher::OK) {
+        QMessageBox::warning(this, "Error", "Failed to stitch images!");
+        return;
+    }
+
+
+    QString resultPath = "result.jpg";
+    displayImage(resultPath, stitchImageLabel);
 }
 
 

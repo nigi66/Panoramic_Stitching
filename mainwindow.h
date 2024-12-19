@@ -36,6 +36,7 @@ private slots:
     void loadFirstImage();
     void loadSecondImage();
     void stitchImages();
+    void stitchingImages();
     void displayImage(const QString &path, QLabel *label);
 
 private:
@@ -44,9 +45,10 @@ private:
     QLabel *imageLabel1;
     QLabel *imageLabel2;
     QLabel *stitchImageLabel;
+    QLabel *correspodenceLabel;
+
     QString imagePath1;
     QString imagePath2;
-
 
 };
 #endif // MAINWINDOW_H
