@@ -35,7 +35,6 @@ public:
 private slots:
     void loadFirstImage();
     void loadSecondImage();
-    void stitchImages();
     void stitchingImages();
     void displayImage(const QString &path, QLabel *label);
 
