@@ -1,6 +1,8 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 
+using namespace cv;
+
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -21,13 +23,22 @@ MainWindow::MainWindow(QWidget *parent)
     layout->addWidget(imageLabel1);
     layout->addWidget(imageLabel2);
 
+    QHBoxLayout *layoutH = new QHBoxLayout(centralWidget);
+    stitchingModeCmb = new QComboBox(this);
+    stitchingModeCmb->addItems({"Panorama", "Scans for grayscale radiography"});
+    QPushButton *stitchingButton = new QPushButton("Stitch Images", this);
+    layoutH->addWidget(stitchingModeCmb);
+    layoutH->addWidget(stitchingButton);
+
+    QHBoxLayout *layoutH1 = new QHBoxLayout(centralWidget);
     QPushButton *loadImage1Button = new QPushButton("Load First Image", this);
     QPushButton *loadImage2Button = new QPushButton("Load Second Image", this);
-    QPushButton *stitchingButton = new QPushButton("Stitch Images", this);
+    layoutH1->addWidget(loadImage1Button);
+    layoutH1->addWidget(loadImage2Button);
+
     layoutV->addLayout(layout);
-    layoutV->addWidget(loadImage1Button);
-    layoutV->addWidget(loadImage2Button);
-    layoutV->addWidget(stitchingButton);
+    layoutV->addLayout(layoutH1);
+    layoutV->addLayout(layoutH);
 
     correspodenceLabel = new QLabel("No image loaded", this);
     correspodenceLabel->setAlignment(Qt::AlignCenter);
@@ -72,6 +83,8 @@ void MainWindow::stitchingImages() {
         return;
     }
 
+
+
     // Load images with OpenCV
     cv::Mat img1 = cv::imread(imagePath1.toStdString());
     cv::Mat img2 = cv::imread(imagePath2.toStdString());
@@ -86,11 +99,11 @@ void MainWindow::stitchingImages() {
 
     std::vector<cv::Mat> images0 = {gray1, gray2};
 
-    //cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE(4.0, cv::Size(8, 8));
-    //clahe->apply(gray1, gray1);
-    //clahe->apply(gray2, gray2);
-    //cv::GaussianBlur(gray1, gray1, cv::Size(5, 5), 0);
-    //cv::GaussianBlur(gray2, gray2, cv::Size(5, 5), 0);
+    cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE(4.0, cv::Size(8, 8));
+    clahe->apply(gray1, gray1);
+    clahe->apply(gray2, gray2);
+    cv::GaussianBlur(gray1, gray1, cv::Size(5, 5), 0);
+    cv::GaussianBlur(gray2, gray2, cv::Size(5, 5), 0);
 
 
     // Detect and compute features using ORB
@@ -114,7 +127,6 @@ void MainWindow::stitchingImages() {
         matches.resize(numMatchesToDraw);
     }
 
-    // Draw top 20 matches
     cv::Mat matchesImg;
     cv::drawMatches(img1, keypoints1, img2, keypoints2, matches, matchesImg, cv::Scalar::all(-1), cv::Scalar::all(-1),
                     std::vector<char>(), cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
@@ -127,20 +139,14 @@ void MainWindow::stitchingImages() {
     cv::cvtColor(gray1, im1, cv::COLOR_GRAY2BGR);
     cv::cvtColor(gray2, im2, cv::COLOR_GRAY2BGR);
 
+    QString guiMode = stitchingModeCmb->currentText();
+    if (guiMode == "Panorama"){
+
     // stitching the images
     std::vector<cv::Mat> images = {img1, img2};
     cv::Mat pano;
     cv::Stitcher::Mode mode = cv::Stitcher::PANORAMA;
     cv::Ptr<cv::Stitcher> stitcher = cv::Stitcher::create(mode);
-
-    // Customizations
-    stitcher->setFeaturesFinder(cv::SIFT::create());
-    stitcher->setFeaturesMatcher(cv::makePtr<cv::detail::BestOf2NearestMatcher>(false, 0.2)); // Matcher config
-    stitcher->setSeamFinder(cv::makePtr<cv::detail::GraphCutSeamFinder>()); // Seam finder
-    stitcher->setBlender(cv::makePtr<cv::detail::FeatherBlender>(1.0)); // Feathering with sharpness=1.0
-    stitcher->setExposureCompensator(cv::makePtr<cv::detail::BlocksGainCompensator>());
-
-
     cv::Stitcher::Status status = stitcher->stitch(images, pano);
 
     if (status != cv::Stitcher::OK) {
@@ -148,10 +154,39 @@ void MainWindow::stitchingImages() {
         return;
     }
 
-
     QString resultPath = "result.jpg";
     cv::imwrite(resultPath.toStdString(), pano);
     displayImage(resultPath, stitchImageLabel);
+    }
+    else if (guiMode == "Scans for grayscale radiography"){
+        cv::Mat im1, im2;
+        cv::cvtColor(gray1, im1, cv::COLOR_GRAY2BGR);
+        cv::cvtColor(gray2, im2, cv::COLOR_GRAY2BGR);
+
+        // stitching the images
+        std::vector<cv::Mat> images = {im1, im2};
+        cv::Mat pano;
+        cv::Stitcher::Mode mode = cv::Stitcher::SCANS;
+        cv::Ptr<cv::Stitcher> stitcher = cv::Stitcher::create(mode);
+
+        // Customizations
+        stitcher->setFeaturesFinder(cv::SIFT::create());
+        stitcher->setFeaturesMatcher(cv::makePtr<cv::detail::BestOf2NearestMatcher>(false, 0.2)); // Matcher config
+        stitcher->setSeamFinder(cv::makePtr<cv::detail::GraphCutSeamFinder>()); // Seam finder
+        stitcher->setBlender(cv::makePtr<cv::detail::FeatherBlender>(1.0)); // Feathering with sharpness=1.0
+        stitcher->setExposureCompensator(cv::makePtr<cv::detail::BlocksGainCompensator>());
+
+        cv::Stitcher::Status status = stitcher->stitch(images, pano);
+
+        if (status != cv::Stitcher::OK) {
+            QMessageBox::warning(this, "Error", "Failed to stitch images!");
+            return;
+        }
+
+        QString resultPath = "result.jpg";
+        cv::imwrite(resultPath.toStdString(), pano);
+        displayImage(resultPath, stitchImageLabel);
+    }
 }
 
 
@@ -159,5 +194,4 @@ void MainWindow::displayImage(const QString &path, QLabel *label){
     QPixmap pixmap(path);
     label->setPixmap(pixmap.scaled(label->size(), Qt::KeepAspectRatio));
 }
-
 

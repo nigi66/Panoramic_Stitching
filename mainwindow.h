@@ -49,6 +49,7 @@ private:
     QLabel *imageLabel2;
     QLabel *stitchImageLabel;
     QLabel *correspodenceLabel;
+    QComboBox *stitchingModeCmb;
 
     QString imagePath1;
     QString imagePath2;
