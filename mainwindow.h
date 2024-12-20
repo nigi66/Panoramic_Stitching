@@ -17,7 +17,11 @@
 #include <QDebug>
 #include <QMessageBox>
 #include <opencv2/opencv.hpp>
+#include <opencv2/xfeatures2d.hpp>
+#include <opencv2/xfeatures2d/nonfree.hpp>
+#include <opencv2/stitching/detail/matchers.hpp>
 #include <opencv2/stitching.hpp>
+#include <iostream>
 
 
 QT_BEGIN_NAMESPACE

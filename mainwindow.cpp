@@ -1,6 +1,7 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 
+
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
@@ -83,6 +84,15 @@ void MainWindow::stitchingImages() {
     cv::cvtColor(img1, gray1, cv::COLOR_BGR2GRAY);
     cv::cvtColor(img2, gray2, cv::COLOR_BGR2GRAY);
 
+    std::vector<cv::Mat> images0 = {gray1, gray2};
+
+    //cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE(4.0, cv::Size(8, 8));
+    //clahe->apply(gray1, gray1);
+    //clahe->apply(gray2, gray2);
+    //cv::GaussianBlur(gray1, gray1, cv::Size(5, 5), 0);
+    //cv::GaussianBlur(gray2, gray2, cv::Size(5, 5), 0);
+
+
     // Detect and compute features using ORB
     cv::Ptr<cv::ORB> orb = cv::ORB::create();
     std::vector<cv::KeyPoint> keypoints1, keypoints2;
@@ -109,16 +119,28 @@ void MainWindow::stitchingImages() {
     cv::drawMatches(img1, keypoints1, img2, keypoints2, matches, matchesImg, cv::Scalar::all(-1), cv::Scalar::all(-1),
                     std::vector<char>(), cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
 
-
     QString matchesPath = "matches.jpg";
     cv::imwrite(matchesPath.toStdString(), matchesImg);
     displayImage(matchesPath, correspodenceLabel);
+
+    cv::Mat im1, im2;
+    cv::cvtColor(gray1, im1, cv::COLOR_GRAY2BGR);
+    cv::cvtColor(gray2, im2, cv::COLOR_GRAY2BGR);
 
     // stitching the images
     std::vector<cv::Mat> images = {img1, img2};
     cv::Mat pano;
     cv::Stitcher::Mode mode = cv::Stitcher::PANORAMA;
     cv::Ptr<cv::Stitcher> stitcher = cv::Stitcher::create(mode);
+
+    // Customizations
+    stitcher->setFeaturesFinder(cv::SIFT::create());
+    stitcher->setFeaturesMatcher(cv::makePtr<cv::detail::BestOf2NearestMatcher>(false, 0.2)); // Matcher config
+    stitcher->setSeamFinder(cv::makePtr<cv::detail::GraphCutSeamFinder>()); // Seam finder
+    stitcher->setBlender(cv::makePtr<cv::detail::FeatherBlender>(1.0)); // Feathering with sharpness=1.0
+    stitcher->setExposureCompensator(cv::makePtr<cv::detail::BlocksGainCompensator>());
+
+
     cv::Stitcher::Status status = stitcher->stitch(images, pano);
 
     if (status != cv::Stitcher::OK) {
